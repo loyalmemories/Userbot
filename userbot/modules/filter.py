@@ -37,7 +37,7 @@ async def filter_incoming_handler(handler):
         pass
 
 
-@register(outgoing=True, pattern="^.filter (\w*)")
+@register(outgoing=True, pattern=r"^\.filter(?: |$)(\w*)")
 async def add_new_filter(new_handler):
     """ For .filter command, allows adding new filters in a chat """
     try:
@@ -46,7 +46,13 @@ async def add_new_filter(new_handler):
         await new_handler.edit("`Running on Non-SQL mode!`")
         return
     keyword = new_handler.pattern_match.group(1)
-    string = new_handler.text.partition(keyword)[2]
+    usage = "`Usage: .filter <name> <text>, or reply to a message with .filter <name>.`"
+    if not keyword:
+        await new_handler.edit(usage)
+        return
+    string = new_handler.text[new_handler.pattern_match.end():]
+    if not string.strip():
+        string = ""
     msg = await new_handler.get_reply_message()
     msg_id = None
     if msg and msg.media and not string:
@@ -68,9 +74,11 @@ async def add_new_filter(new_handler):
                 "`Saving media as reply to the filter requires the BOTLOG_CHATID to be set.`"
             )
             return
-    elif new_handler.reply_to_msg_id and not string:
-        rep_msg = await new_handler.get_reply_message()
-        string = rep_msg.text
+    elif msg and not string:
+        string = msg.text
+    if msg_id is None and not (string and string.strip()):
+        await new_handler.edit(usage)
+        return
     success = "`Filter` **{}** `{} successfully`"
     if add_filter(str(new_handler.chat_id), keyword, string, msg_id) is True:
         await new_handler.edit(success.format(keyword, 'added'))

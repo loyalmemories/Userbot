@@ -38,16 +38,22 @@ async def on_snip(event):
         await event.delete()
 
 
-@register(outgoing=True, pattern="^.snip (\w*)")
+@register(outgoing=True, pattern=r"^\.snip(?: |$)(\w*)")
 async def on_snip_save(event):
     """ For .snip command, saves snips for future use. """
     try:
         from userbot.modules.sql_helper.snips_sql import add_snip
-    except AtrributeError:
+    except AttributeError:
         await event.edit("`Running on Non-SQL mode!`")
         return
     keyword = event.pattern_match.group(1)
-    string = event.text.partition(keyword)[2]
+    usage = "`Usage: .snip <name> <text>, or reply to a message with .snip <name>.`"
+    if not keyword:
+        await event.edit(usage)
+        return
+    string = event.text[event.pattern_match.end():]
+    if not string.strip():
+        string = ""
     msg = await event.get_reply_message()
     msg_id = None
     if msg and msg.media and not string:
@@ -68,9 +74,11 @@ async def on_snip_save(event):
                 "`Saving snips with media requires the BOTLOG_CHATID to be set.`"
             )
             return
-    elif event.reply_to_msg_id and not string:
-        rep_msg = await event.get_reply_message()
-        string = rep_msg.text
+    elif msg and not string:
+        string = msg.text
+    if msg_id is None and not (string and string.strip()):
+        await event.edit(usage)
+        return
     success = "`Snip {} successfully. Use` **${}** `anywhere to get it`"
     if add_snip(keyword, string, msg_id) is False:
         await event.edit(success.format('updated', keyword))
