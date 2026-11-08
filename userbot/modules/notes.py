@@ -45,7 +45,7 @@ async def remove_notes(clr):
             "`Successfully deleted note:` **{}**".format(notename))
 
 
-@register(outgoing=True, pattern=r"^.save (\w*)")
+@register(outgoing=True, pattern=r"^\.save(?: |$)(\w*)")
 async def add_note(fltr):
     """ For .save command, saves notes in a chat. """
     try:
@@ -54,7 +54,13 @@ async def add_note(fltr):
         await fltr.edit("`Running on Non-SQL mode!`")
         return
     keyword = fltr.pattern_match.group(1)
-    string = fltr.text.partition(keyword)[2]
+    usage = "`Usage: .save <name> <text>, or reply to a message with .save <name>.`"
+    if not keyword:
+        await fltr.edit(usage)
+        return
+    string = fltr.text[fltr.pattern_match.end():]
+    if not string.strip():
+        string = ""
     msg = await fltr.get_reply_message()
     msg_id = None
     if msg and msg.media and not string:
@@ -75,9 +81,11 @@ async def add_note(fltr):
                 "`Saving media as data for the note requires the BOTLOG_CHATID to be set.`"
             )
             return
-    elif fltr.reply_to_msg_id and not string:
-        rep_msg = await fltr.get_reply_message()
-        string = rep_msg.text
+    elif msg and not string:
+        string = msg.text
+    if msg_id is None and not (string and string.strip()):
+        await fltr.edit(usage)
+        return
     success = "`Note {} successfully. Use` #{} `to get it`"
     if add_note(str(fltr.chat_id), keyword, string, msg_id) is False:
         return await fltr.edit(success.format('updated', keyword))
